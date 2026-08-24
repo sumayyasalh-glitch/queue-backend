@@ -24,7 +24,7 @@ npm run dev
 
 ## Deploy on Vercel
 
-Create a separate Vercel project with the `backend` directory as its Root Directory. Add these Environment Variables in Vercel:
+Create a separate Vercel project from the `queue-backend` repository. Leave Root Directory empty because the repository itself contains `index.js`. Add these Environment Variables in Vercel:
 
 ```env
 MONGO_URI=mongodb+srv://...
@@ -35,6 +35,7 @@ EMAIL_PASS=your-gmail-app-password
 ```
 
 Then set the frontend Vercel project's `VITE_API_URL` to the deployed backend URL ending in `/api`.
+Verify `https://your-backend-project.vercel.app/api/health` returns `{"status":"ok"}` before testing login.
 
 The service exposes `GET /health` for a health check. All endpoints except `POST /api/auth/register`, `POST /api/auth/login`, `/`, and `/health` require:
 
