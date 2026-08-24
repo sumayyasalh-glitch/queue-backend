@@ -17,6 +17,10 @@ const connectDB = async () => {
     throw new Error("MONGO_URI is not configured");
   }
 
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
   configureDnsServers();
 
   try {

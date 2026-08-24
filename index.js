@@ -66,6 +66,11 @@ const startServer = async () => {
   return app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 };
 
+const vercelHandler = async (req, res) => {
+  await connectDB();
+  return app(req, res);
+};
+
 if (require.main === module) {
   startServer().catch((error) => {
     console.error("Unable to start server:", error.message);
@@ -73,4 +78,6 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, startServer };
+module.exports = vercelHandler;
+module.exports.app = app;
+module.exports.startServer = startServer;

@@ -22,6 +22,20 @@ Then run:
 npm run dev
 ```
 
+## Deploy on Vercel
+
+Create a separate Vercel project with the `backend` directory as its Root Directory. Add these Environment Variables in Vercel:
+
+```env
+MONGO_URI=mongodb+srv://...
+MONGO_DNS_SERVERS=8.8.8.8,1.1.1.1
+JWT_SECRET=replace-with-a-long-random-secret
+EMAIL_USER=your-gmail-address
+EMAIL_PASS=your-gmail-app-password
+```
+
+Then set the frontend Vercel project's `VITE_API_URL` to the deployed backend URL ending in `/api`.
+
 The service exposes `GET /health` for a health check. All endpoints except `POST /api/auth/register`, `POST /api/auth/login`, `/`, and `/health` require:
 
 ```http
