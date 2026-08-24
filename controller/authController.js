@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const generateToken = require("../utils/generateToken");
+const { sendEmail } = require("../utils/emailService");
 
 const register = async (req, res) => {
   try {
@@ -11,10 +12,10 @@ const register = async (req, res) => {
     if (!fullName?.trim() || !normalizedEmail || !password || password.length < 8) {
       return res.status(400).json({ message: "fullName, email, and a password of at least 8 characters are required" });
     }
-    if (requestedRole && !["admin", "doctor", "staff", "patient"].includes(requestedRole)) {
+    if (requestedRole && !["admin", "doctor", "patient"].includes(requestedRole)) {
       return res.status(400).json({ message: "Invalid role" });
     }
-    const normalizedRole = process.env.ALLOW_PUBLIC_STAFF_REGISTRATION === "true" ? (requestedRole || "patient") : "patient";
+    const normalizedRole = requestedRole || "patient";
 
     const existingUser = await User.findOne({ email: normalizedEmail });
 
@@ -32,6 +33,23 @@ const register = async (req, res) => {
       password: hashedPassword,
       role: normalizedRole,
     });
+
+    sendEmail(
+      user.email,
+      "Welcome to QueueCare",
+      `Hello ${user.fullName},
+
+Your QueueCare account has been created successfully.
+Registered email: ${user.email}
+Role: ${user.role}
+
+You can now log in to manage your appointments.
+
+Thank you,
+QueueCare`
+    )
+      .then(() => console.log(`Welcome email sent to ${user.email}`))
+      .catch((emailError) => console.error("Welcome email failed:", emailError.message));
 
     res.status(201).json({
       message: "Registration successful",

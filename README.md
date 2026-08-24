@@ -7,9 +7,13 @@ Create `backend/.env` with:
 ```env
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/queue-management
+# Optional when the system DNS cannot resolve MongoDB Atlas SRV records.
+MONGO_DNS_SERVERS=8.8.8.8,1.1.1.1
 JWT_SECRET=replace-with-a-long-random-secret
-# Set to true only briefly when you need public registration of admin/doctor/staff accounts.
-ALLOW_PUBLIC_STAFF_REGISTRATION=false
+# Set to false in production and create staff accounts through the admin API instead.
+ALLOW_PUBLIC_STAFF_REGISTRATION=true
+EMAIL_USER=your-gmail-address
+EMAIL_PASS=your-gmail-app-password
 ```
 
 Then run:

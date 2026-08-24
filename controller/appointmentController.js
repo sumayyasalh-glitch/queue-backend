@@ -124,16 +124,13 @@ const createAppointment = async (req, res, next) => {
   message: `Appointment booked. Your token number is ${appointment.tokenNumber}.`
 });
 
-      // ==================================================
-      // EMAIL NOTIFICATION
-      // ==================================================
-
-      try {
-
-        await sendEmail(
-          patientUser.email,
-          "Appointment Confirmation - QueueCare",
-          `Hello ${patientUser.fullName || "Patient"},
+      
+      // Send appointment confirmation ONLY to the logged-in patient
+if (patientUser && patientUser.role === "patient") {
+  sendEmail(
+    patientUser.email,
+    "Appointment Confirmation - QueueCare",
+    `Hello ${patientUser.fullName || "Patient"},
 
 Your appointment has been booked successfully.
 
@@ -144,19 +141,35 @@ Reason: ${appointment.reason || "Not provided"}
 
 Thank you,
 QueueCare`
-        );
+  )
+    .then(() => console.log("Appointment confirmation email sent successfully."))
+    .catch((emailError) =>
+      console.log("Email sending failed:", emailError.message)
+    );
+}
+//Send appointment notification to the selected doctor
+sendEmail(
+  doctorUser.email,
+  "New Appointment - QueueCare",
+  `Hello ${doctorUser.fullName || "Doctor"},
 
-        console.log("Appointment confirmation email sent successfully.");
+A new appointment has been booked.
 
-      } catch (emailError) {
+Patient: ${patientUser.fullName || "Patient"}
+Token Number: ${appointment.tokenNumber}
+Date: ${appointment.date.toISOString().split("T")[0]}
+Time Slot: ${appointment.timeSlot}
+Reason: ${appointment.reason || "Not provided"}
 
-        console.log(
-          "Email sending failed:",
-          emailError.message
-        );
+Please check your QueueCare dashboard.
 
-      }
-
+Thank you,
+QueueCare`
+)
+  .then(() => console.log("Doctor appointment email sent successfully."))
+  .catch((emailError) =>
+    console.log("Doctor email sending failed:", emailError)
+  );
 
       // ==================================================
       // SUCCESS RESPONSE
