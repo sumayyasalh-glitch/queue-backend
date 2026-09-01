@@ -8,6 +8,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify transporter connection on startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Email transporter error:", error.message);
+  } else {
+    console.log("✓ Email transporter is ready to send messages");
+  }
+});
+
 const sendEmail = async (to, subject, text) => {
   try {
     if (!to || !subject || !text) {
@@ -18,6 +27,8 @@ const sendEmail = async (to, subject, text) => {
       throw new Error("Email credentials not configured in environment variables");
     }
 
+    console.log(`📧 Attempting to send email to: ${to}`);
+
     const info = await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to,
@@ -25,9 +36,11 @@ const sendEmail = async (to, subject, text) => {
       text,
     });
 
+    console.log(`✓ Email sent successfully. Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("Email sending error:", error.message);
+    console.error(`❌ Email sending error: ${error.message}`);
+    console.error(`Error details:`, error);
     return { success: false, error: error.message };
   }
 };

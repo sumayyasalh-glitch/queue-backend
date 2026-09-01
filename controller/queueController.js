@@ -54,10 +54,12 @@ const callNext = async (req, res, next) => {
     
     // Send email to patient
     if (appointment.patient.email) {
-      sendEmail(
-        appointment.patient.email,
-        "Your Turn - QueueCare",
-        `Hello ${appointment.patient.fullName || "Patient"},
+      (async () => {
+        try {
+          const result = await sendEmail(
+            appointment.patient.email,
+            "Your Turn - QueueCare",
+            `Hello ${appointment.patient.fullName || "Patient"},
 
 Your turn has been called! Please proceed to the consultation room immediately.
 
@@ -67,17 +69,16 @@ Time: ${new Date().toLocaleTimeString()}
 
 Thank you,
 QueueCare Team`
-      )
-        .then((result) => {
-          if (!result.success) {
-            console.error(`Failed to send queue call email: ${result.error}`);
+          );
+          if (result.success) {
+            console.log(`✓ Queue call notification sent to patient: ${appointment.patient.email}`);
           } else {
-            console.log(`Queue call notification sent to patient ${appointment.patient.email}`);
+            console.error(`✗ Failed to send queue call email: ${result.error}`);
           }
-        })
-        .catch((error) => {
-          console.error("Queue call email error:", error.message);
-        });
+        } catch (error) {
+          console.error(`✗ Queue call email error: ${error.message}`);
+        }
+      })();
     }
     
     res.json({ message: "Next patient called", queue, appointment });

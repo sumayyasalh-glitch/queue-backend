@@ -25,15 +25,18 @@ const createNotification = async (req, res) => {
 
     // Send email notification if requested and user has email
     if (shouldSendEmail && user.email) {
-      sendNotificationEmail(user.email, user.fullName, type, { message })
-        .then((result) => {
-          if (!result.success) {
-            console.error(`Failed to send email for notification: ${result.error}`);
+      (async () => {
+        try {
+          const result = await sendNotificationEmail(user.email, user.fullName, type, { message });
+          if (result.success) {
+            console.log(`✓ Notification email sent to ${user.email}`);
+          } else {
+            console.error(`✗ Failed to send email for notification: ${result.error}`);
           }
-        })
-        .catch((error) => {
-          console.error("Error sending notification email:", error.message);
-        });
+        } catch (error) {
+          console.error(`✗ Error sending notification email: ${error.message}`);
+        }
+      })();
     }
 
     res.status(201).json({
@@ -86,8 +89,52 @@ const markAsRead = async (req, res) => {
   }
 };
 
+const testEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "email is required" });
+    }
+
+    const { sendEmail } = require("../utils/emailService");
+
+    const result = await sendEmail(
+      email,
+      "Test Email - QueueCare",
+      `Hello,
+
+This is a test email from QueueCare system.
+
+If you receive this email, the email service is working correctly.
+
+Thank you,
+QueueCare Team`
+    );
+
+    if (result.success) {
+      res.json({
+        message: "Test email sent successfully",
+        messageId: result.messageId,
+        recipient: email,
+      });
+    } else {
+      res.status(400).json({
+        message: "Failed to send test email",
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: "Test email error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createNotification,
   getNotifications,
   markAsRead,
+  testEmail,
 };

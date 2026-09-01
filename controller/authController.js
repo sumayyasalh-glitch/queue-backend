@@ -34,10 +34,12 @@ const register = async (req, res) => {
       role: normalizedRole,
     });
 
-    sendEmail(
-      user.email,
-      "Welcome to QueueCare",
-      `Hello ${user.fullName},
+    (async () => {
+      try {
+        const result = await sendEmail(
+          user.email,
+          "Welcome to QueueCare",
+          `Hello ${user.fullName},
 
 Your QueueCare account has been created successfully.
 Registered email: ${user.email}
@@ -47,17 +49,16 @@ You can now log in to manage your appointments.
 
 Thank you,
 QueueCare Team`
-    )
-      .then((result) => {
+        );
         if (result.success) {
-          console.log(`Welcome email sent to ${user.email}`);
+          console.log(`✓ Welcome email sent to ${user.email}`);
         } else {
-          console.error(`Failed to send welcome email to ${user.email}: ${result.error}`);
+          console.error(`✗ Failed to send welcome email to ${user.email}: ${result.error}`);
         }
-      })
-      .catch((emailError) => {
-        console.error("Welcome email sending error:", emailError.message);
-      });
+      } catch (emailError) {
+        console.error(`✗ Welcome email error: ${emailError.message}`);
+      }
+    })();
 
     res.status(201).json({
       message: "Registration successful",
