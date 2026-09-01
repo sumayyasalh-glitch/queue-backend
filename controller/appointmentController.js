@@ -7,6 +7,11 @@ const { sendEmail } = require("../utils/emailService");
 const privilegedRoles = ["admin", "staff"];
 const queuedStatuses = ["Pending", "Confirmed", "Waiting"];
 
+
+// ======================================================
+// HELPERS
+// ======================================================
+
 const dateOnly = (value) => {
   const date = new Date(value);
 
@@ -23,10 +28,10 @@ const canManage = (user) =>
 
 const canAccess = (appointment, user) =>
   canManage(user) ||
-  appointment.patient._id?.toString() === user.id ||
-  appointment.patient.toString() === user.id ||
-  appointment.doctor._id?.toString() === user.id ||
-  appointment.doctor.toString() === user.id;
+  appointment.patient?._id?.toString() === user.id ||
+  appointment.patient?.toString() === user.id ||
+  appointment.doctor?._id?.toString() === user.id ||
+  appointment.doctor?.toString() === user.id;
 
 const updateQueueCount = (doctor, date, amount) =>
   Queue.updateOne(
@@ -41,13 +46,19 @@ const updateQueueCount = (doctor, date, amount) =>
 
 const createAppointment = async (req, res, next) => {
   try {
+
     if (req.user.role !== "patient") {
       return res.status(403).json({
         message: "Only patients can book appointments"
       });
     }
 
-    const { doctor, date, timeSlot, reason } = req.body;
+    const {
+      doctor,
+      date,
+      timeSlot,
+      reason
+    } = req.body;
 
     const appointmentDate = dateOnly(date);
 
@@ -57,9 +68,10 @@ const createAppointment = async (req, res, next) => {
       });
     }
 
-    // --------------------------------------------------
-    // GET DOCTOR
-    // --------------------------------------------------
+
+    // ==================================================
+    // FIND DOCTOR
+    // ==================================================
 
     const doctorUser = await User.findOne({
       _id: doctor,
@@ -72,11 +84,14 @@ const createAppointment = async (req, res, next) => {
       });
     }
 
-    // --------------------------------------------------
-    // GET PATIENT
-    // --------------------------------------------------
 
-    const patientUser = await User.findById(req.user.id);
+    // ==================================================
+    // FIND PATIENT
+    // ==================================================
+
+    const patientUser = await User.findById(
+      req.user.id
+    );
 
     if (!patientUser) {
       return res.status(404).json({
@@ -84,9 +99,10 @@ const createAppointment = async (req, res, next) => {
       });
     }
 
-    // --------------------------------------------------
+
+    // ==================================================
     // GENERATE QUEUE TOKEN
-    // --------------------------------------------------
+    // ==================================================
 
     const queue = await Queue.findOneAndUpdate(
       {
@@ -109,34 +125,46 @@ const createAppointment = async (req, res, next) => {
       }
     );
 
+
     try {
 
-      // ------------------------------------------------
+      // ==================================================
       // CREATE APPOINTMENT
-      // ------------------------------------------------
+      // ==================================================
 
-      const appointment = await Appointment.create({
-        patient: req.user.id,
-        doctor,
-        date: appointmentDate,
-        timeSlot,
-        reason,
-        tokenNumber: queue.lastToken,
-        status: "Pending"
-      });
+      const appointment =
+        await Appointment.create({
+          patient: req.user.id,
+          doctor,
+          date: appointmentDate,
+          timeSlot,
+          reason,
+          tokenNumber: queue.lastToken,
+          status: "Pending"
+        });
 
-      // ------------------------------------------------
+
+      // ==================================================
       // PATIENT IN-APP NOTIFICATION
-      // ------------------------------------------------
+      // ==================================================
 
       await Notification.create({
         user: req.user.id,
         type: "appointment",
-        message:`Appointment booked. Your token number is ${appointment.tokenNumber}.`
+        message:
+         `Appointment booked. Your token number is ${appointment.tokenNumber}.`
       });
 
+
+      // ==================================================
+      // EMAIL DATE
+      // ==================================================
+
       const formattedDate =
-        appointment.date.toISOString().split("T")[0];
+        appointment.date
+          .toISOString()
+          .split("T")[0];
+
 
       // ==================================================
       // PATIENT EMAIL
@@ -144,9 +172,11 @@ const createAppointment = async (req, res, next) => {
 
       if (patientUser.email) {
 
-        const patientEmailResult = await sendEmail(
+        sendEmail(
           patientUser.email,
+
           "Appointment Confirmation - QueueCare",
+
           `Hello ${patientUser.fullName || "Patient"},
 
 Your appointment has been booked successfully.
@@ -158,29 +188,46 @@ Date: ${formattedDate}
 Time Slot: ${appointment.timeSlot}
 Doctor: ${doctorUser.fullName || "Doctor"}
 Reason: ${appointment.reason || "Not provided"}
-Status: ${appointment.status}
+Status: ${appointment.status
 
-Please arrive on time for your appointment.
+}
 
 Thank you,
 QueueCare Team`
-        );
+        )
+          .then((result) => {
 
-        if (patientEmailResult?.success) {
-          console.log(
-           ' ✓ Patient email sent: ${patientUser.email}'
-          );
-        } else {
-          console.error(
-            ' ✗ Patient email failed: ${patientEmailResult?.error}'
-          );
-        }
+            if (result?.success) {
+
+              console.log(
+                `Patient email sent: ${patientUser.email}`
+              );
+
+            } else {
+
+              console.error(
+                `Patient email failed: ${result?.error || "Unknown error"}`
+              );
+
+            }
+
+          })
+          .catch((error) => {
+
+            console.error(
+              `Patient email error: ${error.message}`
+            );
+
+          });
 
       } else {
+
         console.warn(
-          "⚠️ Patient email not found"
+          `Patient email not found: ${patientUser.email}`
         );
+
       }
+
 
       // ==================================================
       // DOCTOR EMAIL
@@ -188,9 +235,11 @@ QueueCare Team`
 
       if (doctorUser.email) {
 
-        const doctorEmailResult = await sendEmail(
+        sendEmail(
           doctorUser.email,
+
           "New Appointment - QueueCare",
+
           `Hello ${doctorUser.fullName || "Doctor"},
 
 A new appointment has been booked.
@@ -204,42 +253,60 @@ Time Slot: ${appointment.timeSlot}
 Reason: ${appointment.reason || "Not provided"}
 Status: ${appointment.status}
 
-Please check your QueueCare dashboard for more details.
+Please check your QueueCare dashboard.
 
 Thank you,
 QueueCare Team`
-        );
+        )
+          .then((result) => {
 
-        if (doctorEmailResult?.success) {
-          console.log(
-           ' ✓ Doctor email sent: ${doctorUser.email}'
-          );
-        } else {
-          console.error(
-            ' ✗ Doctor email failed: ${doctorEmailResult?.error}'
-          );
-        }
+            if (result?.success) {
+
+              console.log(
+                `Doctor email sent: ${doctorUser.email}`
+              );
+
+            } else {
+
+              console.error(
+                `Doctor email failed: ${result?.error || "Unknown error"}`
+              );
+
+            }
+
+          })
+          .catch((error) => {
+
+            console.error(
+              `Doctor email error: ${error.message}`
+            );
+
+          });
 
       } else {
+
         console.warn(
-          "⚠️ Doctor email not found"
+          `Doctor email not found: ${doctorUser.email}`
         );
+
       }
 
-      // ------------------------------------------------
-      // SUCCESS RESPONSE
-      // ------------------------------------------------
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
 
       return res.status(201).json({
         message: "Appointment created",
         appointment
       });
 
+
     } catch (error) {
 
-      // ------------------------------------------------
+      // ==================================================
       // ROLLBACK QUEUE
-      // ------------------------------------------------
+      // ==================================================
 
       await Queue.updateOne(
         {
@@ -254,19 +321,24 @@ QueueCare Team`
         }
       );
 
+
       if (error?.code === 11000) {
+
         return res.status(409).json({
           message:
             "This doctor already has an appointment in that time slot"
         });
+
       }
 
       throw error;
     }
 
-  }
-  catch (error) {
+
+  } catch (error) {
+
     next(error);
+
   }
 };
 
@@ -275,19 +347,30 @@ QueueCare Team`
 // GET APPOINTMENTS
 // ======================================================
 
-const getAppointments = async (req, res, next) => {
+const getAppointments = async (
+  req,
+  res,
+  next
+) => {
+
   try {
 
     const filter = {};
 
+
+    // Patient sees own appointments
     if (req.user.role === "patient") {
       filter.patient = req.user.id;
     }
 
+
+    // Doctor sees own appointments
     if (req.user.role === "doctor") {
       filter.doctor = req.user.id;
     }
 
+
+    // Admin/staff can filter by doctor
     if (
       req.query.doctor &&
       req.user.role !== "doctor"
@@ -295,6 +378,8 @@ const getAppointments = async (req, res, next) => {
       filter.doctor = req.query.doctor;
     }
 
+
+    // Admin/staff can filter by patient
     if (
       req.query.patient &&
       canManage(req.user)
@@ -302,21 +387,29 @@ const getAppointments = async (req, res, next) => {
       filter.patient = req.query.patient;
     }
 
+
+    // Status filter
     if (req.query.status) {
       filter.status = req.query.status;
     }
 
+
+    // Date filter
     if (req.query.date) {
 
-      const day = dateOnly(req.query.date);
+      const day =
+        dateOnly(req.query.date);
 
       if (!day) {
+
         return res.status(400).json({
           message: "Invalid date"
         });
+
       }
 
-      const nextDay = new Date(day);
+      const nextDay =
+        new Date(day);
 
       nextDay.setUTCDate(
         day.getUTCDate() + 1
@@ -326,28 +419,35 @@ const getAppointments = async (req, res, next) => {
         $gte: day,
         $lt: nextDay
       };
+
     }
 
-    const appointments = await Appointment.find(filter)
-      .populate(
-        "patient",
-        "fullName email"
-      )
-      .populate(
-        "doctor",
-        "fullName email"
-      )
-      .sort({
-        date: 1,
-        timeSlot: 1
-      });
 
-    res.json({
+    const appointments =
+      await Appointment.find(filter)
+        .populate(
+          "patient",
+          "fullName email"
+        )
+        .populate(
+          "doctor",
+          "fullName email"
+        )
+        .sort({
+          date: 1,
+          timeSlot: 1
+        });
+
+
+    return res.json({
       appointments
     });
 
+
   } catch (error) {
+
     next(error);
+
   }
 };
 
@@ -356,11 +456,18 @@ const getAppointments = async (req, res, next) => {
 // GET SINGLE APPOINTMENT
 // ======================================================
 
-const getAppointment = async (req, res, next) => {
+const getAppointment = async (
+  req,
+  res,
+  next
+) => {
+
   try {
 
     const appointment =
-      await Appointment.findById(req.params.id)
+      await Appointment.findById(
+        req.params.id
+      )
         .populate(
           "patient",
           "fullName email"
@@ -370,11 +477,15 @@ const getAppointment = async (req, res, next) => {
           "fullName email"
         );
 
+
     if (!appointment) {
+
       return res.status(404).json({
         message: "Appointment not found"
       });
+
     }
+
 
     if (
       !canAccess(
@@ -382,17 +493,23 @@ const getAppointment = async (req, res, next) => {
         req.user
       )
     ) {
+
       return res.status(403).json({
         message: "Not authorized"
       });
+
     }
 
-    res.json({
+
+    return res.json({
       appointment
     });
 
+
   } catch (error) {
+
     next(error);
+
   }
 };
 
@@ -414,11 +531,15 @@ const updateAppointment = async (
         req.params.id
       );
 
+
     if (!appointment) {
+
       return res.status(404).json({
         message: "Appointment not found"
       });
+
     }
+
 
     if (
       !canAccess(
@@ -426,20 +547,34 @@ const updateAppointment = async (
         req.user
       )
     ) {
+
       return res.status(403).json({
         message: "Not authorized"
       });
+
     }
+
+
+    // ==================================================
+    // CHECK PATIENT
+    // ==================================================
 
     const isPatient =
       appointment.patient.toString() ===
       req.user.id;
 
+
     const originalDate =
       new Date(appointment.date);
 
+
     const originalStatus =
       appointment.status;
+
+
+    // ==================================================
+    // ALLOWED FIELDS
+    // ==================================================
 
     const allowed = isPatient
       ? [
@@ -449,13 +584,20 @@ const updateAppointment = async (
           "status"
         ]
       : req.user.role === "doctor"
-      ? ["status"]
+      ? [
+          "status"
+        ]
       : [
           "date",
           "timeSlot",
           "reason",
           "status"
         ];
+
+
+    // ==================================================
+    // UPDATE FIELDS
+    // ==================================================
 
     for (const key of allowed) {
 
@@ -467,27 +609,47 @@ const updateAppointment = async (
             : req.body[key];
 
       }
+
     }
+
+
+    // ==================================================
+    // DATE VALIDATION
+    // ==================================================
 
     if (
       req.body.date !== undefined &&
       !appointment.date
     ) {
+
       return res.status(400).json({
         message: "Invalid date"
       });
+
     }
+
+
+    // ==================================================
+    // PATIENT STATUS RESTRICTION
+    // ==================================================
 
     if (
       isPatient &&
       req.body.status &&
       req.body.status !== "Cancelled"
     ) {
+
       return res.status(403).json({
         message:
           "Patients can only cancel appointments"
       });
+
     }
+
+
+    // ==================================================
+    // RESCHEDULE RESTRICTION
+    // ==================================================
 
     if (
       isPatient &&
@@ -499,25 +661,39 @@ const updateAppointment = async (
         req.body.timeSlot !== undefined
       )
     ) {
+
       return res.status(409).json({
         message:
           "Only appointments waiting in the queue can be rescheduled"
       });
+
     }
+
+
+    // ==================================================
+    // QUEUE STATUS
+    // ==================================================
 
     const wasQueued =
       queuedStatuses.includes(
         originalStatus
       );
 
+
     const isQueued =
       queuedStatuses.includes(
         appointment.status
       );
 
+
     const movedDate =
       originalDate.getTime() !==
-      appointment.date.getTime();
+      new Date(appointment.date).getTime();
+
+
+    // ==================================================
+    // QUEUE DATE CHANGED
+    // ==================================================
 
     if (movedDate) {
 
@@ -531,6 +707,7 @@ const updateAppointment = async (
 
       }
 
+
       if (isQueued) {
 
         const newQueue =
@@ -538,6 +715,7 @@ const updateAppointment = async (
             {
               doctor:
                 appointment.doctor,
+
               date:
                 appointment.date
             },
@@ -546,6 +724,7 @@ const updateAppointment = async (
                 lastToken: 1,
                 waitingCount: 1
               },
+
               $setOnInsert: {
                 currentToken: 0
               }
@@ -557,12 +736,19 @@ const updateAppointment = async (
             }
           );
 
+
         appointment.tokenNumber =
           newQueue.lastToken;
+
       }
 
-    } else if (
-      !movedDate &&
+    }
+
+    // ==================================================
+    // QUEUE STATUS CHANGED
+    // ==================================================
+
+    else if (
       wasQueued !== isQueued
     ) {
 
@@ -571,24 +757,18 @@ const updateAppointment = async (
         appointment.date,
         isQueued ? 1 : -1
       );
+}
 
-    }
+
+    // ==================================================
+    // SAVE APPOINTMENT
+    // ==================================================
 
     await appointment.save();
 
-    // ==================================================
-    // IN-APP NOTIFICATION
-    // ==================================================
-
-    await Notification.create({
-      user: appointment.patient,
-      type: "appointment",
-      message:
-        `our appointment status is now ${appointment.status}.`
-    });
 
     // ==================================================
-    // GET USERS
+    // FETCH USERS
     // ==================================================
 
     const patientUser =
@@ -600,11 +780,45 @@ const updateAppointment = async (
       await User.findById(
         appointment.doctor
       );
+    
+
+    // ==================================================
+    // PATIENT IN-APP NOTIFICATION
+    // ==================================================
+
+    await Notification.create({
+      user: appointment.patient,
+      type: "appointment",
+      message:
+        `Your appointment status is now ${appointment.status}.`
+    });
+
+
+    // ==================================================
+    // STATUS MESSAGE
+    // ==================================================
+
+    const statusMessage =
+      appointment.status === "Cancelled"
+        ? "Your appointment has been cancelled."
+        : appointment.status === "Confirmed"
+        ? "Your appointment has been confirmed."
+        : appointment.status === "In Consultation"
+        ? "You are now being attended. Please proceed to the consultation room."
+        : appointment.status === "Completed"
+        ? "Your appointment is now complete."
+        : `Your appointment status is now ${appointment.status}.`;
+
+
+    // ==================================================
+    // FORMATTED DATE
+    // ==================================================
 
     const formattedDate =
-      appointment.date
+      new Date(appointment.date)
         .toISOString()
         .split("T")[0];
+
 
     // ==================================================
     // PATIENT STATUS EMAIL
@@ -612,22 +826,12 @@ const updateAppointment = async (
 
     if (patientUser?.email) {
 
-      const statusMessage =
-        appointment.status === "Cancelled"
-          ? "Your appointment has been cancelled."
-          : appointment.status === "Confirmed"
-          ? "Your appointment has been confirmed."
-          : appointment.status === "In Consultation"
-          ? "You are now being attended. Please proceed to the consultation room."
-          : appointment.status === "Completed"
-          ? "Your appointment is now complete."
-          :`Your appointment status is now ${appointment.status}.`;
+      sendEmail(
+        patientUser.email,
 
-      const patientEmailResult =
-        await sendEmail(
-          patientUser.email,
-          "Appointment Status Update - QueueCare",
-          `Hello ${patientUser.fullName || "Patient"},
+        "Appointment Status Update - QueueCare",
+
+        `Hello ${patientUser.fullName || "Patient"},
 
 ${statusMessage}
 
@@ -637,27 +841,46 @@ Date: ${formattedDate}
 Time Slot: ${appointment.timeSlot}
 Doctor: ${doctorUser?.fullName || "Doctor"}
 Status: ${appointment.status}
-Token Number: ${appointment.tokenNumber || "Not assigned"}
+${appointment.tokenNumber
+  ? `Token Number: ${appointment.tokenNumber}`
+  : ""}
 
 Thank you,
 QueueCare Team`
-        );
+      )
+        .then((result) => {
 
-      if (patientEmailResult?.success) {
-        console.log(
-          `✓ Patient status email sent: ${patientUser.email}`
-        );
-      } else {
-        console.error(
-          `✗ Patient status email failed: ${patientEmailResult?.error}`
-        );
-      }
+          if (result?.success) {
+
+            console.log(
+             `Patient status email sent: ${patientUser.email}`
+            );
+
+          } else {
+
+            console.error(
+              `Patient status email failed: ${result?.error || "Unknown error"}`
+            );
+
+          }
+
+        })
+        .catch((error) => {
+
+          console.error(
+            `Patient status email error: ${error.message}`
+          );
+
+        });
 
     } else {
+
       console.warn(
-        "⚠️ Patient email not found"
+        `Patient email not found for status update: ${patientUser?.email}`
       );
+
     }
+
 
     // ==================================================
     // DOCTOR STATUS EMAIL
@@ -668,11 +891,12 @@ QueueCare Team`
       doctorUser?.email
     ) {
 
-      const doctorEmailResult =
-        await sendEmail(
-          doctorUser.email,
-          "Appointment Status Updated - QueueCare",
-          `Hello ${doctorUser.fullName || "Doctor"},
+      sendEmail(
+        doctorUser.email,
+
+        "Appointment Status Updated - QueueCare",
+
+        `Hello ${doctorUser.fullName || "Doctor"},
 
 An appointment status has been updated.
 
@@ -682,40 +906,68 @@ Patient: ${patientUser?.fullName || "Patient"}
 Date: ${formattedDate}
 Time Slot: ${appointment.timeSlot}
 New Status: ${appointment.status}
-Token Number: ${appointment.tokenNumber || "Not assigned"}
+Token Number: ${appointment.tokenNumber || "N/A"}
 
 Please check your QueueCare dashboard for more details.
 
 Thank you,
 QueueCare Team`
-        );
+      )
+        .then((result) => {
 
-      if (doctorEmailResult?.success) {
-        console.log(
-          `✓ Doctor status email sent: ${doctorUser.email}`
-        );
-      } else {
-        console.error(
-          `✗ Doctor status email failed: ${doctorEmailResult?.error}`
-        );
-      }
+          if (result?.success) {
+
+            console.log(
+              `Doctor status email sent: ${doctorUser.email}`
+            );
+
+          } else {
+
+            console.error(
+             `Doctor status email failed: ${result?.error || "Unknown error"}`
+            );
+
+          }
+
+        })
+        .catch((error) => {
+
+          console.error(
+            `Doctor status email error: ${error.message}`
+          );
+
+        });
+
     }
 
-    res.json({
+
+    // ==================================================
+    // SUCCESS RESPONSE
+    // ==================================================
+
+    return res.json({
       message: "Appointment updated",
       appointment
     });
 
+
   } catch (error) {
 
+    // ==================================================
+    // DUPLICATE APPOINTMENT
+    // ==================================================
+
     if (error?.code === 11000) {
+
       return res.status(409).json({
         message:
           "This doctor already has an appointment in that time slot"
       });
+
     }
 
     next(error);
+
   }
 };
 
