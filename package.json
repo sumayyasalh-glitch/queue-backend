@@ -38,7 +38,9 @@
 
     "mongoose": "^9.9.3",
 
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+
+    "resend": "^6.25.0"
 
   },
 
