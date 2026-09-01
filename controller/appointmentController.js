@@ -125,17 +125,15 @@ const createAppointment = async (req, res, next) => {
 });
 
       // ==================================================
-      // SEND EMAIL NOTIFICATIONS (Fire and forget with logging)
+      // SEND EMAIL NOTIFICATIONS
       // ==================================================
 
       // Send appointment confirmation to patient
-      if (patientUser && patientUser.email && patientUser.role === "patient") {
-        (async () => {
-          try {
-            const result = await sendEmail(
-              patientUser.email,
-              "Appointment Confirmation - QueueCare",
-              `Hello ${patientUser.fullName || "Patient"},
+      if (patientUser?.email) {
+        sendEmail(
+          patientUser.email,
+          "Appointment Confirmation - QueueCare",
+          `Hello ${patientUser.fullName || "Patient"},
 
 Your appointment has been booked successfully.
 
@@ -146,26 +144,25 @@ Reason: ${appointment.reason || "Not provided"}
 
 Thank you,
 QueueCare Team`
-            );
-            if (result.success) {
-              console.log(`✓ Appointment confirmation email sent to patient: ${patientUser.email}`);
-            } else {
-              console.error(`✗ Failed to send patient email: ${result.error}`);
-            }
-          } catch (error) {
-            console.error(`✗ Patient email error: ${error.message}`);
+        ).then(result => {
+          if (result.success) {
+            console.log(`✓ Patient email sent: ${patientUser.email}`);
+          } else {
+            console.error(`✗ Patient email failed: ${result.error}`);
           }
-        })();
+        }).catch(err => {
+          console.error(`✗ Patient email error: ${err.message}`);
+        });
+      } else {
+        console.warn(`⚠️ Patient email not found for user: ${patientUser?._id}`);
       }
 
       // Send appointment notification to doctor
-      if (doctorUser && doctorUser.email) {
-        (async () => {
-          try {
-            const result = await sendEmail(
-              doctorUser.email,
-              "New Appointment - QueueCare",
-              `Hello ${doctorUser.fullName || "Doctor"},
+      if (doctorUser?.email) {
+        sendEmail(
+          doctorUser.email,
+          "New Appointment - QueueCare",
+          `Hello ${doctorUser.fullName || "Doctor"},
 
 A new appointment has been booked.
 
@@ -179,16 +176,17 @@ Please check your QueueCare dashboard.
 
 Thank you,
 QueueCare Team`
-            );
-            if (result.success) {
-              console.log(`✓ Appointment notification email sent to doctor: ${doctorUser.email}`);
-            } else {
-              console.error(`✗ Failed to send doctor email: ${result.error}`);
-            }
-          } catch (error) {
-            console.error(`✗ Doctor email error: ${error.message}`);
+        ).then(result => {
+          if (result.success) {
+            console.log(`✓ Doctor email sent: ${doctorUser.email}`);
+          } else {
+            console.error(`✗ Doctor email failed: ${result.error}`);
           }
-        })();
+        }).catch(err => {
+          console.error(`✗ Doctor email error: ${err.message}`);
+        });
+      } else {
+        console.warn(`⚠️ Doctor email not found for user: ${doctorUser?._id}`);
       }
 
       // ==================================================
@@ -577,7 +575,7 @@ const updateAppointment = async (
     const doctorUser = await User.findById(appointment.doctor);
 
     // Send email to patient about status change
-    if (patientUser && patientUser.email) {
+    if (patientUser?.email) {
       const statusMessage = appointment.status === "Cancelled" 
         ? "Your appointment has been cancelled."
         : appointment.status === "Confirmed"
@@ -588,12 +586,10 @@ const updateAppointment = async (
         ? "Your appointment is now complete."
         : `Your appointment status is now ${appointment.status}.`;
 
-      (async () => {
-        try {
-          const result = await sendEmail(
-            patientUser.email,
-            `Appointment Status Update - QueueCare`,
-            `Hello ${patientUser.fullName || "Patient"},
+      sendEmail(
+        patientUser.email,
+        `Appointment Status Update - QueueCare`,
+        `Hello ${patientUser.fullName || "Patient"},
 
 ${statusMessage}
 
@@ -606,26 +602,25 @@ ${appointment.tokenNumber ? `Token Number: ${appointment.tokenNumber}` : ""}
 
 Thank you,
 QueueCare Team`
-          );
-          if (result.success) {
-            console.log(`✓ Appointment status update email sent to patient: ${patientUser.email}`);
-          } else {
-            console.error(`✗ Failed to send patient update email: ${result.error}`);
-          }
-        } catch (error) {
-          console.error(`✗ Patient update email error: ${error.message}`);
+      ).then(result => {
+        if (result.success) {
+          console.log(`✓ Patient status update email sent: ${patientUser.email}`);
+        } else {
+          console.error(`✗ Patient status email failed: ${result.error}`);
         }
-      })();
+      }).catch(err => {
+        console.error(`✗ Patient status email error: ${err.message}`);
+      });
+    } else {
+      console.warn(`⚠️ Patient email not found for status update`);
     }
 
     // Notify doctor if status changed
-    if (originalStatus !== appointment.status && doctorUser && doctorUser.email) {
-      (async () => {
-        try {
-          const result = await sendEmail(
-            doctorUser.email,
-            `Appointment Status Updated - QueueCare`,
-            `Hello ${doctorUser.fullName || "Doctor"},
+    if (originalStatus !== appointment.status && doctorUser?.email) {
+      sendEmail(
+        doctorUser.email,
+        `Appointment Status Updated - QueueCare`,
+        `Hello ${doctorUser.fullName || "Doctor"},
 
 An appointment status has been updated.
 
@@ -639,16 +634,15 @@ Please check your QueueCare dashboard for more details.
 
 Thank you,
 QueueCare Team`
-          );
-          if (result.success) {
-            console.log(`✓ Appointment status update email sent to doctor: ${doctorUser.email}`);
-          } else {
-            console.error(`✗ Failed to send doctor update email: ${result.error}`);
-          }
-        } catch (error) {
-          console.error(`✗ Doctor update email error: ${error.message}`);
+      ).then(result => {
+        if (result.success) {
+          console.log(`✓ Doctor status update email sent: ${doctorUser.email}`);
+        } else {
+          console.error(`✗ Doctor status email failed: ${result.error}`);
         }
-      })();
+      }).catch(err => {
+        console.error(`✗ Doctor status email error: ${err.message}`);
+      });
     }
 
     res.json({

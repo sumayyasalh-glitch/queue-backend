@@ -33,6 +33,7 @@ const sendEmail = async (to, subject, text) => {
       from: process.env.EMAIL_USER,
       to,
       subject,
+      html: `<html><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">${text.replace(/\n/g, '<br>')}</body></html>`,
       text,
     });
 

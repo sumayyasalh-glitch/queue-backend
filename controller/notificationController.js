@@ -24,19 +24,20 @@ const createNotification = async (req, res) => {
     });
 
     // Send email notification if requested and user has email
-    if (shouldSendEmail && user.email) {
-      (async () => {
-        try {
-          const result = await sendNotificationEmail(user.email, user.fullName, type, { message });
+    if (shouldSendEmail && user?.email) {
+      sendNotificationEmail(user.email, user.fullName, type, { message })
+        .then(result => {
           if (result.success) {
-            console.log(`✓ Notification email sent to ${user.email}`);
+            console.log(`✓ Notification email sent: ${user.email}`);
           } else {
-            console.error(`✗ Failed to send email for notification: ${result.error}`);
+            console.error(`✗ Notification email failed: ${result.error}`);
           }
-        } catch (error) {
-          console.error(`✗ Error sending notification email: ${error.message}`);
-        }
-      })();
+        })
+        .catch(err => {
+          console.error(`✗ Notification email error: ${err.message}`);
+        });
+    } else if (shouldSendEmail && !user?.email) {
+      console.warn(`⚠️ User email not found for notification`);
     }
 
     res.status(201).json({
