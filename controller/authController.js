@@ -46,10 +46,18 @@ Role: ${user.role}
 You can now log in to manage your appointments.
 
 Thank you,
-QueueCare`
+QueueCare Team`
     )
-      .then(() => console.log(`Welcome email sent to ${user.email}`))
-      .catch((emailError) => console.error("Welcome email failed:", emailError.message));
+      .then((result) => {
+        if (result.success) {
+          console.log(`Welcome email sent to ${user.email}`);
+        } else {
+          console.error(`Failed to send welcome email to ${user.email}: ${result.error}`);
+        }
+      })
+      .catch((emailError) => {
+        console.error("Welcome email sending error:", emailError.message);
+      });
 
     res.status(201).json({
       message: "Registration successful",

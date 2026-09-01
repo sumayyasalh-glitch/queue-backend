@@ -1,18 +1,40 @@
 const Notification = require("../models/Notification");
+const User = require("../models/User");
+const { sendNotificationEmail } = require("../utils/emailService");
 
 const createNotification = async (req, res) => {
   try {
-    const { type, message } = req.body;
+    const { type, message, recipientId, sendEmail: shouldSendEmail } = req.body;
 
     if (!type || !message) {
       return res.status(400).json({ message: "type and message are required" });
     }
 
+    const userId = recipientId || req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     const notification = await Notification.create({
-      user: req.user.id,
+      user: userId,
       type,
       message,
     });
+
+    // Send email notification if requested and user has email
+    if (shouldSendEmail && user.email) {
+      sendNotificationEmail(user.email, user.fullName, type, { message })
+        .then((result) => {
+          if (!result.success) {
+            console.error(`Failed to send email for notification: ${result.error}`);
+          }
+        })
+        .catch((error) => {
+          console.error("Error sending notification email:", error.message);
+        });
+    }
 
     res.status(201).json({
       message: "Notification created",
