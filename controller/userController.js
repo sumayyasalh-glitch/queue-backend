@@ -2,12 +2,14 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 
 const staffRoles = ["admin", "doctor", "staff"];
+const doctorDepartments = ["General Medicine", "ENT", "Dental", "Ophthalmology", "Dermatology", "Orthopedics", "Cardiology", "Gastroenterology", "Respiratory", "Neurology", "Pediatrics", "Gynecology", "Urology", "Emergency Care"];
 
 const sanitizeUser = (user) => ({
   id: user._id,
   fullName: user.fullName,
   email: user.email,
   role: user.role,
+  department: user.department || "",
   createdAt: user.createdAt,
 });
 
@@ -48,24 +50,36 @@ const updateCurrentUser = async (req, res, next) => {
 
 const getDoctors = async (req, res, next) => {
   try {
-    const doctors = await User.find({ role: "doctor" }).select("fullName email role").sort({ fullName: 1 });
+    const doctors = await User.find({ role: "doctor" }).select("fullName email role department").sort({ fullName: 1 });
     res.json({ doctors: doctors.map(sanitizeUser) });
+  } catch (error) { next(error); }
+};
+
+const getUsers = async (req, res, next) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
+    const users = await User.find().select("fullName email role department createdAt").sort({ createdAt: -1 });
+    res.json({ users: users.map(sanitizeUser) });
   } catch (error) { next(error); }
 };
 
 const createStaffUser = async (req, res, next) => {
   try {
     if (req.user.role !== "admin") return res.status(403).json({ message: "Admin access required" });
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, password, role, department } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
     const normalizedRole = role?.toLowerCase();
     if (!fullName?.trim() || !normalizedEmail || !password || password.length < 8 || !staffRoles.includes(normalizedRole)) {
       return res.status(400).json({ message: "fullName, email, password (8+ characters), and an admin, doctor, or staff role are required" });
     }
     if (await User.exists({ email: normalizedEmail })) return res.status(409).json({ message: "Email is already in use" });
-    const user = await User.create({ fullName: fullName.trim(), email: normalizedEmail, password: await bcrypt.hash(password, 10), role: normalizedRole });
+    const selectedDepartment = department?.trim() || "";
+    if (normalizedRole === "doctor" && !doctorDepartments.includes(selectedDepartment)) {
+      return res.status(400).json({ message: "Select a valid department for the doctor" });
+    }
+    const user = await User.create({ fullName: fullName.trim(), email: normalizedEmail, password: await bcrypt.hash(password, 10), role: normalizedRole, department: normalizedRole === "doctor" ? selectedDepartment : "" });
     res.status(201).json({ message: "User created", user: sanitizeUser(user) });
   } catch (error) { next(error); }
 };
 
-module.exports = { getCurrentUser, updateCurrentUser, getDoctors, createStaffUser };
+module.exports = { getCurrentUser, updateCurrentUser, getDoctors, getUsers, createStaffUser };

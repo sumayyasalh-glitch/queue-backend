@@ -57,15 +57,31 @@ const createAppointment = async (req, res, next) => {
       doctor,
       date,
       timeSlot,
-      reason
+      reason,
+      patientName,
+      patientContact,
+      relationship,
+      paymentMethod
     } = req.body;
 
     const appointmentDate = dateOnly(date);
+
+    const isFamilyBooking = relationship && relationship.trim().toLowerCase() !== "self";
 
     if (!doctor || !appointmentDate || !timeSlot) {
       return res.status(400).json({
         message: "doctor, date, and timeSlot are required"
       });
+    }
+
+    if (isFamilyBooking && (!patientName?.trim() || !patientContact?.trim())) {
+      return res.status(400).json({
+        message: "Family member username and email are required"
+      });
+    }
+
+    if (paymentMethod && paymentMethod !== "Pay at Hospital") {
+      return res.status(400).json({ message: "Invalid payment method" });
     }
 
 
@@ -139,6 +155,11 @@ const createAppointment = async (req, res, next) => {
           date: appointmentDate,
           timeSlot,
           reason,
+          patientName: patientName?.trim() || patientUser.fullName,
+          patientContact: patientContact?.trim() || patientUser.email,
+          relationship: relationship?.trim() || "Self",
+          paymentMethod: paymentMethod || "Pay at Hospital",
+          paymentStatus: "Pending",
           tokenNumber: queue.lastToken,
           status: "Pending"
         });
@@ -246,7 +267,8 @@ A new appointment has been booked.
 
 Appointment Details:
 
-Patient: ${patientUser.fullName || "Patient"}
+Patient: ${appointment.patientName || patientUser.fullName || "Patient"}
+Booked by: ${patientUser.fullName || "Patient"} (${appointment.relationship || "Self"})
 Token Number: ${appointment.tokenNumber}
 Date: ${formattedDate}
 Time Slot: ${appointment.timeSlot}
@@ -341,7 +363,6 @@ QueueCare Team`
 
   }
 };
-
 
 // ======================================================
 // GET APPOINTMENTS
@@ -560,7 +581,7 @@ const updateAppointment = async (
     // ==================================================
 
     const isPatient =
-      appointment.patient.toString() ===
+      appointment.patient?.toString() ===
       req.user.id;
 
 
@@ -591,7 +612,8 @@ const updateAppointment = async (
           "date",
           "timeSlot",
           "reason",
-          "status"
+          "status",
+          "paymentStatus"
         ];
 
 
@@ -610,6 +632,15 @@ const updateAppointment = async (
 
       }
 
+    }
+
+    if (
+      req.body.paymentStatus !== undefined &&
+      !["Pending", "Paid"].includes(req.body.paymentStatus)
+    ) {
+      return res.status(400).json({
+        message: "Payment status must be Pending or Paid"
+      });
     }
 
 

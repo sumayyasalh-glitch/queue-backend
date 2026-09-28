@@ -5,7 +5,7 @@ const appointmentSchema = new mongoose.Schema(
     patient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
     },
 
     doctor: {
@@ -27,6 +27,35 @@ const appointmentSchema = new mongoose.Schema(
     reason: {
       type: String,
       trim: true,
+    },
+
+    // The signed-in patient owns the booking. These fields identify a family
+    // member when the account holder books care on their behalf.
+    patientName: {
+      type: String,
+      trim: true,
+    },
+
+    patientContact: {
+      type: String,
+      trim: true,
+    },
+
+    relationship: {
+      type: String,
+      trim: true,
+    },
+
+    paymentMethod: {
+      type: String,
+      enum: ["Pay at Hospital"],
+      default: "Pay at Hospital",
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Paid"],
+      default: "Pending",
     },
 
     status: {

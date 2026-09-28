@@ -4,8 +4,7 @@ const { createAppointment, getAppointments, getAppointment, updateAppointment } 
 
 const router = express.Router();
 
-router.use(protect);
-router.route("/").post(createAppointment).get(getAppointments);
-router.route("/:id").get(getAppointment).patch(updateAppointment);
+router.route("/").post(protect, createAppointment).get(protect, getAppointments);
+router.route("/:id").get(protect, getAppointment).patch(protect, updateAppointment);
 
 module.exports = router;
